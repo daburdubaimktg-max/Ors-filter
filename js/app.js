@@ -14,32 +14,33 @@
     btnRetake: $("btn-retake"), btnMirror: $("btn-mirror"), file: $("file-input"),
     name: $("name"),
     crownToggle: $("crown-toggle"), crownY: $("crown-y"), crownPosField: $("crown-pos-field"), crownStatus: $("crown-status"),
+    crownSize: $("crown-size"), crownSizeField: $("crown-size-field"),
     btnDownload: $("btn-download"), btnShare: $("btn-share"), btnHelp: $("btn-help"), help: $("help"), toast: $("toast"),
   };
   const ctx = els.stage.getContext("2d", { alpha: false });
 
   // ---------- Themes ----------
   const THEMES = {
-    olive: { scrimTop: "rgba(10,24,14,0.6)", scrimBottom: "rgba(8,20,12,0.92)", accent: "#C9A227", accent2: "#E5C65A",
-             text: "#F7F1E1", muted: "rgba(247,241,225,0.72)", topText: "#F7F1E1", topMuted: "rgba(247,241,225,0.72)",
+    olive: { scrimBottom: "rgba(8,20,12,0.92)", accent: "#C9A227", accent2: "#E5C65A",
+             text: "#F7F1E1", muted: "rgba(247,241,225,0.72)",
              leaf: "#C9A227", leafVein: "#7BA05B", frame: "rgba(201,162,39,0.85)" },
-    gold:  { scrimTop: "rgba(0,0,0,0.55)", scrimBottom: "rgba(0,0,0,0.92)", accent: "#E5C65A", accent2: "#F3DE8A",
-             text: "#FFFFFF", muted: "rgba(255,255,255,0.7)", topText: "#FFFFFF", topMuted: "rgba(255,255,255,0.7)",
+    gold:  { scrimBottom: "rgba(0,0,0,0.92)", accent: "#E5C65A", accent2: "#F3DE8A",
+             text: "#FFFFFF", muted: "rgba(255,255,255,0.7)",
              leaf: "#E5C65A", leafVein: "#B8891E", frame: "rgba(229,198,90,0.9)" },
-    ivory: { scrimTop: "rgba(10,24,14,0.55)", scrimBottom: "rgba(245,239,224,0.94)", accent: "#2E5A2A", accent2: "#C9A227",
-             text: "#17301B", muted: "rgba(23,48,27,0.7)", topText: "#F7F1E1", topMuted: "rgba(247,241,225,0.72)",
+    ivory: { scrimBottom: "rgba(245,239,224,0.94)", accent: "#2E5A2A", accent2: "#7A5C0E",
+             text: "#17301B", muted: "rgba(23,48,27,0.7)",
              leaf: "#7BA05B", leafVein: "#2E5A2A", frame: "rgba(46,90,42,0.85)" },
     // Kente: woven-strip border in Ghana's kente colours, bold and celebratory.
-    kente: { scrimTop: "rgba(10,10,10,0.6)", scrimBottom: "rgba(10,10,10,0.9)", accent: "#C9A227", accent2: "#F2C230",
-             text: "#FFFFFF", muted: "rgba(255,255,255,0.75)", topText: "#FFFFFF", topMuted: "rgba(255,255,255,0.75)",
+    kente: { scrimBottom: "rgba(10,10,10,0.9)", accent: "#C9A227", accent2: "#F2C230",
+             text: "#FFFFFF", muted: "rgba(255,255,255,0.75)",
              leaf: "#F2C230", leafVein: "#006B3F", frame: "rgba(242,194,48,0.9)", border: "kente" },
     // Noir: black-and-white portrait, gold type. Editorial.
-    noir:  { scrimTop: "rgba(0,0,0,0.6)", scrimBottom: "rgba(0,0,0,0.94)", accent: "#D4AF37", accent2: "#D4AF37",
-             text: "#FFFFFF", muted: "rgba(255,255,255,0.7)", topText: "#FFFFFF", topMuted: "rgba(255,255,255,0.7)",
+    noir:  { scrimBottom: "rgba(0,0,0,0.94)", accent: "#D4AF37", accent2: "#D4AF37",
+             text: "#FFFFFF", muted: "rgba(255,255,255,0.7)",
              leaf: "#D4AF37", leafVein: "#8A6D1E", frame: "rgba(255,255,255,0.75)", grade: "mono" },
     // Golden Hour: warm sunset grade, amber and cream.
-    golden:{ scrimTop: "rgba(60,20,5,0.5)", scrimBottom: "rgba(58,20,8,0.93)", accent: "#F2994A", accent2: "#FFD27A",
-             text: "#FFF6E6", muted: "rgba(255,246,230,0.75)", topText: "#FFF6E6", topMuted: "rgba(255,246,230,0.75)",
+    golden:{ scrimBottom: "rgba(58,20,8,0.93)", accent: "#F2994A", accent2: "#FFD27A",
+             text: "#FFF6E6", muted: "rgba(255,246,230,0.75)",
              leaf: "#FFD27A", leafVein: "#C8651B", frame: "rgba(255,210,122,0.85)", grade: "warm" },
   };
   const KENTE = ["#C9A227", "#C8102E", "#006B3F", "#111111"];
@@ -56,15 +57,17 @@
     theme: "olive",
     name: "",
     crown: true,
-    crownY: 0.26,             // manual fallback, fraction of H (center of crown)
-    face: null,               // smoothed {cx, cy, w, h} in canvas px
-    faceRaw: null,
-    faceSupported: false,
-    detector: null,
-    detecting: false,
-    lastDetect: 0,
+    crownY: 0.26,             // manual placement, fraction of H (base of crown)
+    crownScale: 1,            // user size multiplier
+    face: null,               // smoothed head pose in canvas px: {x, y, w, angle} (crown base centre, head width, roll)
+    faceRaw: null,            // latest detected pose
+    lastSeen: 0,              // time the head was last detected (camera mode)
+    tracker: null,            // MediaPipe FaceLandmarker once loaded
+    trackerStatus: "loading", // loading | ready | unavailable
+    lastVideoTime: -1,
     raf: 0,
-    logos: { ors: null, ghaba: null },
+    logos: { orsLockup: null, ghaba: null, orsMark: null },
+    tinted: new Map(),
   };
 
   // ---------- Utilities ----------
@@ -152,11 +155,12 @@
     ctx.restore();
   }
 
-  function drawCrown(cx, cy, width, t) {
-    // Two olive branches meeting at the top, forming a laurel.
-    const r = width / 2;
+  function drawCrown(x, y, width, angle, t) {
+    // Two olive branches meeting at the top, forming a laurel. (x, y) is the centre of the crown's base.
+    const r = width / 2, cx = 0, cy = 0;
     const leafLen = r * 0.30, leafWid = leafLen * 0.34;
     ctx.save();
+    ctx.translate(x, y); ctx.rotate(angle);
     ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
     for (const side of [-1, 1]) {
       // stem arc from side-bottom (angle ~ 165°) to top (angle ~ 95°)
@@ -207,18 +211,82 @@
     strip(0, 0, W, band, false); strip(0, H - band, W, band, false);
   }
 
+  // ---------- Drawing: brand marks ----------
+  // Returns the ORS mark recoloured to `color` at height `h` (cached).
+  function tintedMark(color, h) {
+    const img = state.logos.orsMark; if (!img) return null;
+    const key = color + "|" + h;
+    if (state.tinted.has(key)) return state.tinted.get(key);
+    const w = Math.round(h * (img.width / img.height));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d");
+    x.drawImage(img, 0, 0, w, h);
+    x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, w, h);
+    state.tinted.set(key, c);
+    return c;
+  }
+
+  // "GHABA × ORS OLIVE OIL" lockup, centred on (cx, cy).
+  function drawLockup(cx, cy, t) {
+    ctx.save();
+    ctx.textBaseline = "middle";
+    const gap = 34;
+    // Left: GHABA (logo if supplied, else wordmark)
+    let ghabaW, ghabaDraw;
+    if (state.logos.ghaba) {
+      const lg = state.logos.ghaba, lh = 92, lw = lh * (lg.width / lg.height);
+      ghabaW = lw; ghabaDraw = (x) => ctx.drawImage(lg, x, cy - lh / 2, lw, lh);
+    } else {
+      ctx.font = "800 50px Inter, sans-serif";
+      const letters = [..."GHABA"], sp = 6;
+      ghabaW = letters.reduce((a, c) => a + ctx.measureText(c).width, 0) + sp * (letters.length - 1);
+      ghabaDraw = (x) => { ctx.fillStyle = t.text; ctx.font = "800 50px Inter, sans-serif"; spacedText("GHABA", x, cy + 2, sp, "left"); };
+    }
+    // Right: ORS Olive Oil (official lockup if supplied, else ORS mark + OLIVE OIL)
+    let orsW, orsDraw;
+    if (state.logos.orsLockup) {
+      const lg = state.logos.orsLockup, lh = 110, lw = lh * (lg.width / lg.height);
+      orsW = lw; orsDraw = (x) => ctx.drawImage(lg, x, cy - lh / 2, lw, lh);
+    } else {
+      const markH = 74, mark = tintedMark(t.text, markH);
+      const markW = mark ? mark.width : 150;
+      ctx.font = "700 21px Inter, sans-serif";
+      const sub = "OLIVE OIL", sp = 7;
+      const subW = [...sub].reduce((a, c) => a + ctx.measureText(c).width, 0) + sp * (sub.length - 1);
+      orsW = Math.max(markW, subW);
+      orsDraw = (x) => {
+        const mx = x + (orsW - markW) / 2, top = cy - (markH + 30) / 2;
+        if (mark) ctx.drawImage(mark, mx, top);
+        else { ctx.fillStyle = t.text; ctx.font = "800 70px 'Playfair Display', serif"; ctx.textAlign = "center"; ctx.fillText("ORS", x + orsW / 2, top + markH / 2); ctx.textAlign = "left"; }
+        ctx.fillStyle = t.accent2; ctx.font = "700 21px Inter, sans-serif";
+        spacedText(sub, x + orsW / 2, top + markH + 22, sp, "center");
+      };
+    }
+    ctx.font = "300 46px Inter, sans-serif";
+    const xW = ctx.measureText("×").width;
+    const total = ghabaW + gap + xW + gap + orsW;
+    let x = cx - total / 2;
+    ghabaDraw(x); x += ghabaW + gap;
+    ctx.fillStyle = t.muted; ctx.font = "300 46px Inter, sans-serif"; ctx.textAlign = "left"; ctx.fillText("×", x, cy); x += xW + gap;
+    orsDraw(x);
+    ctx.restore();
+  }
+
   // ---------- Drawing: overlay ----------
   function drawOverlay() {
     const t = THEMES[state.theme];
     const M = 44; // inner frame margin
 
-    // Scrims
-    let g = ctx.createLinearGradient(0, 0, 0, H * 0.28);
-    g.addColorStop(0, t.scrimTop); g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H * 0.28);
-    g = ctx.createLinearGradient(0, H * 0.50, 0, H);
-    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.55, t.scrimBottom.replace(/[\d.]+\)$/, "0.75)")); g.addColorStop(1, t.scrimBottom);
-    ctx.fillStyle = g; ctx.fillRect(0, H * 0.50, W, H * 0.5);
+    // Crown first, so the frame and title sit on top of any part that runs off the head.
+    if (state.crown) {
+      const pose = crownPose();
+      if (pose) drawCrown(pose.x, pose.y, pose.w, pose.angle, t);
+    }
+
+    // Bottom scrim only; the top of the frame stays clear for the head and crown.
+    const g = ctx.createLinearGradient(0, H * 0.6, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.5, t.scrimBottom.replace(/[\d.]+\)$/, "0.7)")); g.addColorStop(1, t.scrimBottom);
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.6, W, H * 0.4);
 
     if (t.border === "kente") drawKenteBorder();
 
@@ -231,135 +299,131 @@
       ctx.beginPath(); ctx.moveTo(x, y + sy * 28); ctx.lineTo(x, y + sy * tick); ctx.stroke();
     }
 
-    // Top band: GHABA × ORS
-    ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillStyle = t.topText;
-    if (state.logos.ghaba) {
-      const lg = state.logos.ghaba, lh = 84, lw = lh * (lg.width / lg.height);
-      ctx.drawImage(lg, W / 2 - lw / 2 - 150, 128 - lh / 2, lw, lh);
-      ctx.font = "800 44px Inter, sans-serif"; ctx.fillText("×", W / 2, 128);
-      ctx.font = "800 56px 'Playfair Display', serif"; ctx.fillText("ORS", W / 2 + 130, 128);
-    } else {
-      ctx.font = "800 46px Inter, sans-serif";
-      spacedText("GHABA  ×  ORS", W / 2, 128, 8);
-    }
-    ctx.font = "600 24px Inter, sans-serif"; ctx.fillStyle = t.topMuted;
-    spacedText("GHANA HAIRDRESSERS & BEAUTICIANS ASSOCIATION", W / 2, 180, 3);
-
-    // Kente stripe
-    const kx0 = 300, kx1 = W - 300, ky = 216, kh = 10;
-    const seg = (kx1 - kx0) / 16;
-    for (let i = 0; i < 16; i++) { ctx.fillStyle = KENTE[i % 4]; ctx.fillRect(kx0 + i * seg, ky, seg + 0.5, kh); }
-
-    // Crown
-    if (state.crown) {
-      let cx = W / 2, cy = H * state.crownY, width = W * 0.52;
-      if (state.face) {
-        const f = state.face;
-        width = clamp(f.w * 1.45, 260, W * 0.8);
-        cx = f.cx; cy = f.cy - f.h * 0.62;
-      }
-      // Keep the laurel clear of the header band (top) and the title block (bottom).
-      const crownTop = width / 2 * 0.62 + width * 0.16;
-      cy = clamp(cy, 250 + crownTop, H - 700);
-      drawCrown(cx, cy, width, t);
-    }
-
-    // Bottom block
+    // Bottom block: name, title, kente stripe, GHABA × ORS Olive Oil lockup.
     const cxT = W / 2;
-    let y = H - 540;
-
-    ctx.fillStyle = t.accent2; ctx.font = "700 30px Inter, sans-serif";
-    spacedText("STYLIST OF THE", cxT, y, 12); y += 92;
-
-    ctx.fillStyle = t.text; ctx.font = "800 190px 'Playfair Display', serif";
-    ctx.fillText("FUTURE", cxT, y); y += 118;
-
-    // gold rule with diamond
-    ctx.strokeStyle = t.accent; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cxT - 240, y); ctx.lineTo(cxT - 30, y); ctx.moveTo(cxT + 30, y); ctx.lineTo(cxT + 240, y); ctx.stroke();
-    ctx.fillStyle = t.accent; ctx.save(); ctx.translate(cxT, y); ctx.rotate(Math.PI / 4); ctx.fillRect(-9, -9, 18, 18); ctx.restore();
-    y += 92;
-
-    // Name
-    const name = state.name.trim() || "Your Name";
-    ctx.fillStyle = state.name.trim() ? t.text : t.muted;
-    fitFont(name, "'Playfair Display', serif", 800, 104, 56, W - 2 * (M + 40), "italic");
-    ctx.fillText(name, cxT, y);
-
-    // Footer row: ORS Olive Oil (left) · hashtag (right)
-    const fy = H - 118;
-    ctx.textAlign = "left";
-    if (state.logos.ors) {
-      const lg = state.logos.ors, lh = 96, lw = lh * (lg.width / lg.height);
-      ctx.drawImage(lg, M + 40, fy - lh / 2, lw, lh);
-    } else {
-      ctx.fillStyle = t.text; ctx.font = "800 64px 'Playfair Display', serif"; ctx.textBaseline = "alphabetic";
-      ctx.fillText("ORS", M + 40, fy + 8);
-      const orsW = ctx.measureText("ORS").width;
-      ctx.font = "700 22px Inter, sans-serif"; ctx.fillStyle = t.accent2;
-      ctx.textBaseline = "middle";
-      spacedText("OLIVE", M + 40 + orsW + 18, fy - 14, 4, "left");
-      spacedText("OIL", M + 40 + orsW + 18, fy + 14, 4, "left");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const name = state.name.trim();
+    if (name) {
+      ctx.fillStyle = t.text;
+      fitFont(name, "'Playfair Display', serif", 800, 112, 56, W - 2 * (M + 50), "italic");
+      ctx.fillText(name, cxT, H - 440);
     }
-    ctx.textAlign = "right"; ctx.textBaseline = "middle";
-    ctx.font = "600 30px Inter, sans-serif"; ctx.fillStyle = t.muted;
-    ctx.fillText("#StylistOfTheFuture", W - M - 40, fy);
-    ctx.textAlign = "center";
+    ctx.fillStyle = t.accent2; ctx.font = "700 34px Inter, sans-serif";
+    spacedText("STYLIST OF THE FUTURE", cxT, H - 345, 9);
+
+    const kw = 360, kx0 = cxT - kw / 2, ky = H - 290, seg = kw / 12;
+    for (let i = 0; i < 12; i++) { ctx.fillStyle = KENTE[i % 4]; ctx.fillRect(kx0 + i * seg, ky, seg + 0.5, 8); }
+
+    drawLockup(cxT, H - 175, t);
+  }
+
+  // Where to draw the crown: the tracked head, or the manual position.
+  function crownPose() {
+    const k = state.crownScale;
+    if (state.face) {
+      const f = state.face;
+      return { x: f.x, y: f.y, w: f.w * 1.42 * k, angle: f.angle };
+    }
+    if (state.mode === "camera" && state.trackerStatus === "ready") return null; // tracking but no head in view
+    return { x: W / 2, y: H * state.crownY + W * 0.2, w: W * 0.6 * k, angle: 0 };
   }
 
   function render() { drawPhoto(); drawOverlay(); }
 
-  // ---------- Face detection ----------
-  async function initDetector() {
-    if (!("FaceDetector" in window)) { state.faceSupported = false; return; }
+  // ---------- Head tracking (MediaPipe Face Landmarker) ----------
+  const MP_VERSION = "1.0.1";
+  const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
+  const MP_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+  // Face-mesh landmark indices.
+  const LM = { forehead: 10, chin: 152, faceLeft: 234, faceRight: 454, eyeA: 33, eyeB: 263 };
+
+  async function initTracker() {
+    state.trackerStatus = "loading"; updateCrownUI();
     try {
-      state.detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-      state.faceSupported = true;
-    } catch { state.faceSupported = false; }
+      const vision = await import(`${MP_BASE}/vision_bundle.mjs`);
+      const fileset = await vision.FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+      const make = (delegate) => vision.FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MP_MODEL, delegate },
+        runningMode: "VIDEO", numFaces: 1,
+        minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+      });
+      try { state.tracker = await make("GPU"); } catch { state.tracker = await make("CPU"); }
+      state.trackerStatus = "ready";
+      if (state.mode === "photo") { detectStill(); render(); }
+    } catch (err) {
+      console.warn("Head tracking unavailable:", err);
+      state.trackerStatus = "unavailable";
+    }
     updateCrownUI();
   }
 
-  function faceToCanvas(box) {
+  // Convert normalised landmarks on the current source into a crown pose in canvas px.
+  function poseFromLandmarks(lm) {
     const { s, dx, dy } = coverTransform(state.srcW, state.srcH);
-    let cx = dx + (box.x + box.width / 2) * s;
-    const cy = dy + (box.y + box.height / 2) * s;
-    if (state.mirror) cx = W - cx;
-    return { cx, cy, w: box.width * s, h: box.height * s };
+    const P = (i) => {
+      let x = dx + lm[i].x * state.srcW * s; const y = dy + lm[i].y * state.srcH * s;
+      if (state.mirror) x = W - x;
+      return { x, y };
+    };
+    const top = P(LM.forehead), chin = P(LM.chin), fl = P(LM.faceLeft), fr = P(LM.faceRight);
+    let e1 = P(LM.eyeA), e2 = P(LM.eyeB);
+    if (e1.x > e2.x) [e1, e2] = [e2, e1];
+    const faceW = Math.hypot(fr.x - fl.x, fr.y - fl.y);
+    const faceH = Math.hypot(top.x - chin.x, top.y - chin.y);
+    const ux = (top.x - chin.x) / (faceH || 1), uy = (top.y - chin.y) / (faceH || 1); // "up" along the head
+    // Base of the laurel sits at temple height, so the branches wrap the sides of the head and meet above it.
+    const drop = faceH * 0.16;
+    return { x: top.x - ux * drop, y: top.y - uy * drop, w: faceW, angle: Math.atan2(e2.y - e1.y, e2.x - e1.x) };
   }
 
-  async function detectFaces(force = false) {
-    if (!state.detector || !state.source || state.detecting) return;
-    const now = performance.now();
-    if (!force && now - state.lastDetect < 160) return;
-    state.lastDetect = now; state.detecting = true;
+  function detectVideo() {
+    const v = els.video;
+    if (!state.tracker || v.readyState < 2 || v.currentTime === state.lastVideoTime) return;
+    state.lastVideoTime = v.currentTime;
     try {
-      const faces = await state.detector.detect(state.source);
-      if (faces && faces.length) {
-        const box = faces[0].boundingBox;
-        state.faceRaw = faceToCanvas(box);
-        if (!state.face) state.face = { ...state.faceRaw };
-      } else if (state.mode === "camera") {
-        // keep last position briefly, then release
-        if (now - state.lastDetect > 1200) state.faceRaw = null;
+      const res = state.tracker.detectForVideo(v, performance.now());
+      if (res.faceLandmarks && res.faceLandmarks.length) {
+        state.faceRaw = poseFromLandmarks(res.faceLandmarks[0]);
+        state.lastSeen = performance.now();
+      } else if (performance.now() - state.lastSeen > 500) {
+        state.faceRaw = null;
       }
-    } catch { /* ignore detection errors */ }
-    state.detecting = false;
+    } catch (err) { console.warn(err); }
+  }
+
+  function detectStill() {
+    state.face = null; state.faceRaw = null;
+    if (!state.tracker || !state.source) return;
+    try {
+      // In video mode the tracker first looks where the previous face was; a new photo can need a second pass.
+      for (let i = 0; i < 3 && !state.face; i++) {
+        const res = state.tracker.detectForVideo(state.source, performance.now() + i);
+        if (res.faceLandmarks && res.faceLandmarks.length) { state.faceRaw = poseFromLandmarks(res.faceLandmarks[0]); state.face = { ...state.faceRaw }; }
+      }
+    } catch (err) { console.warn(err); }
     updateCrownUI();
   }
 
   function smoothFace() {
-    if (!state.faceRaw) { if (state.mode !== "photo") state.face = null; return; }
-    const f = state.face, r = state.faceRaw, k = state.mode === "photo" ? 1 : 0.25;
-    state.face = f ? { cx: lerp(f.cx, r.cx, k), cy: lerp(f.cy, r.cy, k), w: lerp(f.w, r.w, k), h: lerp(f.h, r.h, k) } : { ...r };
+    const r = state.faceRaw;
+    if (!r) { state.face = null; return; }
+    const f = state.face;
+    if (!f) { state.face = { ...r }; return; }
+    const k = 0.45;
+    state.face = { x: lerp(f.x, r.x, k), y: lerp(f.y, r.y, k), w: lerp(f.w, r.w, k), angle: lerp(f.angle, r.angle, 0.35) };
   }
 
+  let lastStatus = "";
   function updateCrownUI() {
-    const tracking = state.faceSupported && !!state.face;
-    els.crownPosField.hidden = !state.crown || tracking;
-    els.crownStatus.textContent = state.faceSupported
-      ? (tracking ? "· following your face" : "· no face found, place manually")
-      : "· face tracking not available in this browser";
-    els.crownStatus.hidden = !state.crown;
+    const tracking = state.trackerStatus === "ready";
+    const found = !!state.face;
+    els.crownPosField.hidden = !state.crown || (tracking && (found || state.mode === "camera"));
+    els.crownSizeField.hidden = !state.crown;
+    const status = !state.crown ? "" :
+      state.trackerStatus === "loading" ? "Loading head tracking…" :
+      state.trackerStatus === "unavailable" ? "Head tracking is off here. Place the crown with the slider." :
+      found ? "Crown is following your head." : state.mode === "camera" ? "Look at the camera to place the crown." : "No face found. Place the crown with the slider.";
+    if (status !== lastStatus) { els.crownStatus.textContent = status; lastStatus = status; }
   }
 
   // ---------- Camera ----------
@@ -375,7 +439,7 @@
       await els.video.play();
       state.source = els.video; state.srcW = els.video.videoWidth; state.srcH = els.video.videoHeight;
       state.mirror = state.facing === "user";
-      state.mode = "camera"; state.face = null; state.faceRaw = null;
+      state.mode = "camera"; state.face = null; state.faceRaw = null; state.lastVideoTime = -1;
       setMode("camera");
       loop();
     } catch (err) {
@@ -398,7 +462,7 @@
     const tick = () => {
       if (state.mode !== "camera") return;
       if (els.video.videoWidth) { state.srcW = els.video.videoWidth; state.srcH = els.video.videoHeight; }
-      detectFaces(); smoothFace(); render();
+      detectVideo(); smoothFace(); updateCrownUI(); render();
       state.raf = requestAnimationFrame(tick);
     };
     state.raf = requestAnimationFrame(tick);
@@ -417,9 +481,11 @@
     cancelAnimationFrame(state.raf);
     stopCamera();
     state.source = off; state.srcW = off.width; state.srcH = off.height;
+    const livePose = state.face;
     state.mode = "photo"; setMode("photo");
-    if (state.face) state.faceRaw = { ...state.face };
-    await detectFaces(true); smoothFace(); render();
+    detectStill();
+    if (!state.face && livePose) { state.face = livePose; state.faceRaw = { ...livePose }; } // keep the live pose if the still misses
+    updateCrownUI(); render();
     toast("Captured. Add your name and save.");
   }
 
@@ -433,10 +499,9 @@
       stopCamera();
       state.source = img; state.srcW = img.naturalWidth; state.srcH = img.naturalHeight;
       state.mirror = false; els.btnMirror.setAttribute("aria-pressed", "false");
-      state.mode = "photo"; state.face = null; state.faceRaw = null;
+      state.mode = "photo";
       setMode("photo");
-      render();
-      await detectFaces(true); smoothFace(); render();
+      detectStill(); render();
     };
     img.onerror = () => { URL.revokeObjectURL(url); toast("Couldn't read that image."); };
     img.src = url;
@@ -477,7 +542,7 @@
     const file = new File([blob], fileName(), { type: "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "GHABA × ORS · Stylist of the Future", text: "#StylistOfTheFuture" });
+        await navigator.share({ files: [file], title: "GHABA × ORS Olive Oil · Stylist of the Future", text: "#StylistOfTheFuture" });
       } catch (err) { if (err && err.name !== "AbortError") download(); }
     } else download();
   }
@@ -498,7 +563,7 @@
   // ---------- Optional brand logos ----------
   function loadLogo(key, src) {
     const img = new Image();
-    img.onload = () => { state.logos[key] = img; if (state.mode === "photo") render(); };
+    img.onload = () => { state.logos[key] = img; state.tinted.clear(); if (state.mode !== "camera") render(); };
     img.onerror = () => {};
     img.src = src;
   }
@@ -511,7 +576,8 @@
   els.btnRetake.addEventListener("click", startCamera);
   els.btnMirror.addEventListener("click", () => {
     state.mirror = !state.mirror; els.btnMirror.setAttribute("aria-pressed", String(state.mirror));
-    if (state.face) { state.face.cx = W - state.face.cx; if (state.faceRaw) state.faceRaw.cx = W - state.faceRaw.cx; }
+    const flip = (p) => p && Object.assign(p, { x: W - p.x, angle: -p.angle });
+    flip(state.face); if (state.faceRaw !== state.face) flip(state.faceRaw);
     render();
   });
   els.file.addEventListener("change", (e) => { loadFile(e.target.files[0]); e.target.value = ""; });
@@ -524,6 +590,7 @@
   }));
   els.crownToggle.addEventListener("change", () => { state.crown = els.crownToggle.checked; updateCrownUI(); if (state.mode === "photo") render(); });
   els.crownY.addEventListener("input", () => { state.crownY = parseFloat(els.crownY.value); if (state.mode === "photo") render(); });
+  els.crownSize.addEventListener("input", () => { state.crownScale = parseFloat(els.crownSize.value); if (state.mode === "photo") render(); });
   els.btnDownload.addEventListener("click", download);
   els.btnShare.addEventListener("click", share);
   els.btnHelp.addEventListener("click", () => els.help.showModal());
@@ -539,8 +606,9 @@
   // ---------- Boot ----------
   function boot() {
     restore();
-    initDetector();
-    loadLogo("ors", "assets/ors-logo.png");
+    initTracker();
+    loadLogo("orsMark", "assets/ors-mark.svg");
+    loadLogo("orsLockup", "assets/ors-olive-oil-logo.png"); // optional official lockup overrides the drawn one
     loadLogo("ghaba", "assets/ghaba-logo.png");
     if (navigator.share) els.btnShare.hidden = false;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -556,5 +624,5 @@
   boot();
 
   // Expose a tiny hook for testing.
-  window.CrownCam = { state, render, loadFile };
+  window.CrownCam = { state, render, loadFile, detectStill };
 })();
