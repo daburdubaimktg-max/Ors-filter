@@ -12,7 +12,7 @@
     cameraControls: $("camera-controls"), photoControls: $("photo-controls"),
     btnCamera: $("btn-camera"), btnFlip: $("btn-flip"), btnShutter: $("btn-shutter"), btnTimer: $("btn-timer"),
     btnRetake: $("btn-retake"), btnMirror: $("btn-mirror"), file: $("file-input"),
-    name: $("name"), city: $("city"), salon: $("salon"),
+    name: $("name"),
     crownToggle: $("crown-toggle"), crownY: $("crown-y"), crownPosField: $("crown-pos-field"), crownStatus: $("crown-status"),
     btnDownload: $("btn-download"), btnShare: $("btn-share"), btnHelp: $("btn-help"), help: $("help"), toast: $("toast"),
   };
@@ -29,6 +29,18 @@
     ivory: { scrimTop: "rgba(10,24,14,0.55)", scrimBottom: "rgba(245,239,224,0.94)", accent: "#2E5A2A", accent2: "#C9A227",
              text: "#17301B", muted: "rgba(23,48,27,0.7)", topText: "#F7F1E1", topMuted: "rgba(247,241,225,0.72)",
              leaf: "#7BA05B", leafVein: "#2E5A2A", frame: "rgba(46,90,42,0.85)" },
+    // Kente: woven-strip border in Ghana's kente colours, bold and celebratory.
+    kente: { scrimTop: "rgba(10,10,10,0.6)", scrimBottom: "rgba(10,10,10,0.9)", accent: "#C9A227", accent2: "#F2C230",
+             text: "#FFFFFF", muted: "rgba(255,255,255,0.75)", topText: "#FFFFFF", topMuted: "rgba(255,255,255,0.75)",
+             leaf: "#F2C230", leafVein: "#006B3F", frame: "rgba(242,194,48,0.9)", border: "kente" },
+    // Noir: black-and-white portrait, gold type. Editorial.
+    noir:  { scrimTop: "rgba(0,0,0,0.6)", scrimBottom: "rgba(0,0,0,0.94)", accent: "#D4AF37", accent2: "#D4AF37",
+             text: "#FFFFFF", muted: "rgba(255,255,255,0.7)", topText: "#FFFFFF", topMuted: "rgba(255,255,255,0.7)",
+             leaf: "#D4AF37", leafVein: "#8A6D1E", frame: "rgba(255,255,255,0.75)", grade: "mono" },
+    // Golden Hour: warm sunset grade, amber and cream.
+    golden:{ scrimTop: "rgba(60,20,5,0.5)", scrimBottom: "rgba(58,20,8,0.93)", accent: "#F2994A", accent2: "#FFD27A",
+             text: "#FFF6E6", muted: "rgba(255,246,230,0.75)", topText: "#FFF6E6", topMuted: "rgba(255,246,230,0.75)",
+             leaf: "#FFD27A", leafVein: "#C8651B", frame: "rgba(255,210,122,0.85)", grade: "warm" },
   };
   const KENTE = ["#C9A227", "#C8102E", "#006B3F", "#111111"];
 
@@ -42,7 +54,7 @@
     stream: null,
     timer: false,
     theme: "olive",
-    name: "", city: "", salon: "",
+    name: "",
     crown: true,
     crownY: 0.26,             // manual fallback, fraction of H (center of crown)
     face: null,               // smoothed {cx, cy, w, h} in canvas px
@@ -109,6 +121,21 @@
     if (state.mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
     ctx.drawImage(src, dx, dy, sw * s, sh * s);
     ctx.restore();
+    // Photo grade via composite ops (supported in every browser, including Safari).
+    const grade = THEMES[state.theme].grade;
+    if (grade) {
+      ctx.save();
+      if (grade === "mono") {
+        ctx.globalCompositeOperation = "saturation"; ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(0, 0, W, H);
+      } else if (grade === "warm") {
+        ctx.globalCompositeOperation = "soft-light"; ctx.fillStyle = "rgba(255,140,40,0.55)"; ctx.fillRect(0, 0, W, H);
+        const g = ctx.createRadialGradient(W * 0.8, H * 0.1, 0, W * 0.8, H * 0.1, H * 0.7);
+        g.addColorStop(0, "rgba(255,190,90,0.35)"); g.addColorStop(1, "rgba(255,190,90,0)");
+        ctx.globalCompositeOperation = "screen"; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      ctx.restore();
+    }
   }
 
   // ---------- Drawing: crown ----------
@@ -159,6 +186,27 @@
     ctx.restore();
   }
 
+  // ---------- Drawing: kente border ----------
+  function drawKenteBorder() {
+    const band = 34, block = 56;
+    const colours = ["#F2C230", "#C8102E", "#006B3F", "#111111", "#F2C230", "#006B3F"];
+    const strip = (x, y, w, h, vertical) => {
+      const len = vertical ? h : w, n = Math.ceil(len / block);
+      for (let i = 0; i < n; i++) {
+        ctx.fillStyle = colours[i % colours.length];
+        if (vertical) ctx.fillRect(x, y + i * block, w, block + 0.5); else ctx.fillRect(x + i * block, y, block + 0.5, h);
+        // woven detail: thin cross-threads
+        ctx.fillStyle = i % 2 ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)";
+        for (let k = 1; k < 4; k++) {
+          if (vertical) ctx.fillRect(x, y + i * block + k * (block / 4) - 2, w, 4);
+          else ctx.fillRect(x + i * block + k * (block / 4) - 2, y, 4, h);
+        }
+      }
+    };
+    strip(0, 0, band, H, true); strip(W - band, 0, band, H, true);
+    strip(0, 0, W, band, false); strip(0, H - band, W, band, false);
+  }
+
   // ---------- Drawing: overlay ----------
   function drawOverlay() {
     const t = THEMES[state.theme];
@@ -171,6 +219,8 @@
     g = ctx.createLinearGradient(0, H * 0.50, 0, H);
     g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.55, t.scrimBottom.replace(/[\d.]+\)$/, "0.75)")); g.addColorStop(1, t.scrimBottom);
     ctx.fillStyle = g; ctx.fillRect(0, H * 0.50, W, H * 0.5);
+
+    if (t.border === "kente") drawKenteBorder();
 
     // Inner frame with corner ticks
     ctx.strokeStyle = t.frame; ctx.lineWidth = 3;
@@ -216,7 +266,7 @@
 
     // Bottom block
     const cxT = W / 2;
-    let y = H - 640;
+    let y = H - 540;
 
     ctx.fillStyle = t.accent2; ctx.font = "700 30px Inter, sans-serif";
     spacedText("STYLIST OF THE", cxT, y, 12); y += 92;
@@ -234,26 +284,7 @@
     const name = state.name.trim() || "Your Name";
     ctx.fillStyle = state.name.trim() ? t.text : t.muted;
     fitFont(name, "'Playfair Display', serif", 800, 104, 56, W - 2 * (M + 40), "italic");
-    ctx.fillText(name, cxT, y); y += 88;
-
-    // City · Ghana with pin
-    const city = (state.city.trim() || "Your City").toUpperCase();
-    const cityLine = `${city}  ·  GHANA`;
-    ctx.font = "700 36px Inter, sans-serif";
-    ctx.fillStyle = state.city.trim() ? t.accent2 : t.muted;
-    const tw = spacedText(cityLine, cxT + 22, y, 5);
-    // pin icon
-    const px = cxT + 22 - tw / 2 - 30, py = y;
-    ctx.fillStyle = t.accent2;
-    ctx.beginPath(); ctx.arc(px, py - 8, 12, Math.PI, 0); ctx.lineTo(px, py + 16); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = state.theme === "ivory" ? "#F5EFE0" : "#0b120d";
-    ctx.beginPath(); ctx.arc(px, py - 8, 5, 0, Math.PI * 2); ctx.fill();
-    y += 62;
-
-    // Salon / handle
-    if (state.salon.trim()) {
-      ctx.font = "500 32px Inter, sans-serif"; ctx.fillStyle = t.muted; ctx.fillText(state.salon.trim(), cxT, y);
-    }
+    ctx.fillText(name, cxT, y);
 
     // Footer row: ORS Olive Oil (left) · hashtag (right)
     const fy = H - 118;
@@ -454,14 +485,12 @@
   // ---------- Persistence ----------
   const LS = "crowncam.v1";
   function save() {
-    try { localStorage.setItem(LS, JSON.stringify({ name: state.name, city: state.city, salon: state.salon, theme: state.theme })); } catch {}
+    try { localStorage.setItem(LS, JSON.stringify({ name: state.name, theme: state.theme })); } catch {}
   }
   function restore() {
     try {
       const d = JSON.parse(localStorage.getItem(LS) || "{}");
       if (d.name) { state.name = d.name; els.name.value = d.name; }
-      if (d.city) { state.city = d.city; els.city.value = d.city; }
-      if (d.salon) { state.salon = d.salon; els.salon.value = d.salon; }
       if (d.theme && THEMES[d.theme]) { state.theme = d.theme; const r = document.querySelector(`input[name=theme][value=${d.theme}]`); if (r) r.checked = true; }
     } catch {}
   }
@@ -487,7 +516,7 @@
   });
   els.file.addEventListener("change", (e) => { loadFile(e.target.files[0]); e.target.value = ""; });
 
-  for (const key of ["name", "city", "salon"]) {
+  for (const key of ["name"]) {
     els[key].addEventListener("input", () => { state[key] = els[key].value; save(); if (state.mode === "photo") render(); });
   }
   document.querySelectorAll("input[name=theme]").forEach((r) => r.addEventListener("change", () => {

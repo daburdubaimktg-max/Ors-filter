@@ -112,7 +112,7 @@ button, input, label { font: inherit; }
 .segmented label { position: relative; }
 .segmented input { position: absolute; opacity: 0; inset: 0; }
 .segmented span {
-  display: block; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+  display: block; text-align: center; padding: 10px 6px; white-space: nowrap; border-radius: 10px; border: 1px solid var(--line);
   cursor: pointer; font-weight: 600; color: var(--text); font-size: 14px;
 }
 .segmented input:checked + span { background: var(--gold); color: #1a1a1a; border-color: var(--gold); }

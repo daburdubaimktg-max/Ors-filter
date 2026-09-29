@@ -1,7 +1,7 @@
 # CrownCam — GHABA × ORS Olive Oil · Stylist of the Future
 
 A browser-based AR photo frame for ORS Olive Oil Ghana's **GHABA × ORS "Stylist of the Future"** programme.
-Stylists open it on their phone, take a selfie or upload a work photo, type their name and city, and save a
+Stylists open it on their phone, take a selfie or upload a work photo, type their name, and save a
 1080 × 1920 image ready for Instagram, WhatsApp or TikTok Stories.
 
 No app install, no backend, nothing uploaded — the camera feed and the final image never leave the phone.
@@ -10,12 +10,13 @@ No app install, no backend, nothing uploaded — the camera feed and the final i
 
 - **Live camera** (front/back, 3-second timer, mirror) or **photo upload**.
 - **Frame overlay**: "GHABA × ORS" wordmark with a kente-inspired stripe, "Stylist of the Future" title,
-  the stylist's name, city + Ghana, optional salon/handle, and an ORS Olive Oil sign-off with the hashtag.
+  the stylist's name, and an ORS Olive Oil sign-off with the hashtag.
 - **Olive-leaf crown** that follows the face where the browser supports face detection
   (Chrome/Edge on Android; Safari falls back to a manual position slider).
-- **Three looks**: Olive, Gold, Ivory.
+- **Six looks**: Olive, Gold, Ivory, Kente (woven kente-strip border), Noir (black-and-white portrait with gold
+  type) and Golden Hour (warm sunset grade). Photo grades use canvas blend modes, so they work in Safari too.
 - **Save for Stories** (PNG, 9:16) and native **Share** on phones that support it.
-- Remembers name/city on the device for repeat use.
+- Remembers the name and chosen look on the device for repeat use.
 
 ## Run it
 

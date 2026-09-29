@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#14261A" />
   <title>CrownCam · GHABA × ORS Olive Oil</title>
-  <meta name="description" content="CrownCam — a browser-based Stories frame for GHABA × ORS Olive Oil 'Stylist of the Future'. Add your name and city to a portrait or work photo and share." />
+  <meta name="description" content="CrownCam — a browser-based Stories frame for GHABA × ORS Olive Oil 'Stylist of the Future'. Add your name to a live selfie or work photo and share." />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -64,21 +64,6 @@
         <label for="name">Stylist name</label>
         <input id="name" type="text" maxlength="40" placeholder="e.g. Ama Serwaa" autocomplete="name" />
       </div>
-      <div class="field">
-        <label for="city">City</label>
-        <input id="city" type="text" maxlength="30" placeholder="e.g. Accra" list="gh-cities" autocomplete="address-level2" />
-        <datalist id="gh-cities">
-          <option value="Accra"></option><option value="Kumasi"></option><option value="Takoradi"></option>
-          <option value="Tamale"></option><option value="Cape Coast"></option><option value="Tema"></option>
-          <option value="Koforidua"></option><option value="Sunyani"></option><option value="Ho"></option>
-          <option value="Bolgatanga"></option><option value="Wa"></option><option value="Techiman"></option>
-          <option value="Obuasi"></option><option value="Kasoa"></option>
-        </datalist>
-      </div>
-      <div class="field">
-        <label for="salon">Salon / handle <span class="muted">(optional)</span></label>
-        <input id="salon" type="text" maxlength="36" placeholder="e.g. @amaserwaa_hair" />
-      </div>
 
       <div class="field">
         <span class="label">Look</span>
@@ -86,6 +71,9 @@
           <label><input type="radio" name="theme" value="olive" checked /><span>Olive</span></label>
           <label><input type="radio" name="theme" value="gold" /><span>Gold</span></label>
           <label><input type="radio" name="theme" value="ivory" /><span>Ivory</span></label>
+          <label><input type="radio" name="theme" value="kente" /><span>Kente</span></label>
+          <label><input type="radio" name="theme" value="noir" /><span>Noir</span></label>
+          <label><input type="radio" name="theme" value="golden" /><span>Golden Hour</span></label>
         </div>
       </div>
 
@@ -111,7 +99,7 @@
       <h2>How CrownCam works</h2>
       <ol>
         <li>Open your camera or upload a portrait / work photo.</li>
-        <li>Type your name and city. Pick a look.</li>
+        <li>Type your name and pick one of six looks.</li>
         <li>Tap <em>Save for Stories</em>, then post it and tag <strong>#StylistOfTheFuture</strong>.</li>
       </ol>
       <p class="muted">The olive-leaf crown follows your face when your browser supports face detection; otherwise use the slider to place it.</p>
