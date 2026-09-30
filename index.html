@@ -44,6 +44,12 @@
         </div>
       </div>
 
+      <div id="zoom-row" class="zoom-row" hidden>
+        <span class="zoom-end" aria-hidden="true">Whole photo</span>
+        <input id="zoom" type="range" min="0" max="1" step="0.01" value="0" aria-label="Photo zoom: whole photo to fill frame" />
+        <span class="zoom-end" aria-hidden="true">Fill frame</span>
+      </div>
+
       <div id="camera-controls" class="camera-controls" hidden>
         <button id="btn-flip" class="pill" type="button" title="Switch camera">⟲ Flip</button>
         <button id="btn-shutter" class="shutter" type="button" aria-label="Take photo"></button>

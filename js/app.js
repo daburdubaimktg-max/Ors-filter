@@ -14,7 +14,7 @@
     btnRetake: $("btn-retake"), btnMirror: $("btn-mirror"), file: $("file-input"),
     name: $("name"),
     crownToggle: $("crown-toggle"), crownY: $("crown-y"), crownPosField: $("crown-pos-field"), crownStatus: $("crown-status"),
-    crownSize: $("crown-size"), crownSizeField: $("crown-size-field"),
+    crownSize: $("crown-size"), crownSizeField: $("crown-size-field"), zoom: $("zoom"), zoomRow: $("zoom-row"),
     btnDownload: $("btn-download"), btnShare: $("btn-share"), btnHelp: $("btn-help"), help: $("help"), toast: $("toast"),
   };
   const ctx = els.stage.getContext("2d", { alpha: false });
@@ -58,6 +58,7 @@
     name: "",
     crown: true,
     crownY: 0.26,             // manual placement, fraction of H (base of crown)
+    zoom: 0,                  // 0 = whole photo visible (fit), 1 = photo fills the frame (cover)
     crownScale: 1,            // user size multiplier
     face: null,               // smoothed head pose in canvas px: {x, y, w, angle} (crown base centre, head width, roll)
     faceRaw: null,            // latest detected pose
@@ -83,6 +84,29 @@
     // Scale + offset so the source covers the W×H canvas (centered).
     const s = Math.max(W / sw, H / sh);
     return { s, dx: (W - sw * s) / 2, dy: (H - sh * s) / 2 };
+  }
+
+  // Where the photo sits on the canvas: between "whole photo visible" (zoom 0) and "fills the frame" (zoom 1).
+  // Cameras rarely deliver 9:16, so filling the frame crops the sides or top; fitting shows everything.
+  function photoTransform(sw, sh) {
+    const fit = Math.min(W / sw, H / sh), fill = Math.max(W / sw, H / sh);
+    const s = lerp(fit, fill, state.zoom);
+    return { s, dx: (W - sw * s) / 2, dy: (H - sh * s) / 2 };
+  }
+
+  // Soft backdrop behind a fitted photo: the same image shrunk to a few pixels and stretched back up.
+  // Cheap enough for every video frame and works in every browser (no canvas filter needed).
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = 27; blurCanvas.height = 48;
+  const blurCtx = blurCanvas.getContext("2d");
+  function drawBackdrop(src, sw, sh) {
+    const { s, dx, dy } = coverTransform(sw, sh);
+    blurCtx.drawImage(src, dx / W * 27, dy / H * 48, sw * s / W * 27, sh * s / H * 48);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(blurCanvas, 0, 0, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
   }
 
   function fitFont(text, family, weight, maxPx, minPx, maxWidth, style = "") {
@@ -119,9 +143,10 @@
     ctx.fillStyle = "#0b120d"; ctx.fillRect(0, 0, W, H);
     const src = state.source; if (!src) return;
     const sw = state.srcW, sh = state.srcH; if (!sw || !sh) return;
-    const { s, dx, dy } = coverTransform(sw, sh);
+    const { s, dx, dy } = photoTransform(sw, sh);
     ctx.save();
     if (state.mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    if (sw * s < W - 1 || sh * s < H - 1) drawBackdrop(src, sw, sh);
     ctx.drawImage(src, dx, dy, sw * s, sh * s);
     ctx.restore();
     // Photo grade via composite ops (supported in every browser, including Safari).
@@ -359,7 +384,7 @@
 
   // Convert normalised landmarks on the current source into a crown pose in canvas px.
   function poseFromLandmarks(lm) {
-    const { s, dx, dy } = coverTransform(state.srcW, state.srcH);
+    const { s, dx, dy } = photoTransform(state.srcW, state.srcH);
     const P = (i) => {
       let x = dx + lm[i].x * state.srcW * s; const y = dy + lm[i].y * state.srcH * s;
       if (state.mirror) x = W - x;
@@ -432,7 +457,9 @@
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: state.facing, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        // Ask for the sensor's full 4:3 picture. A 1080p (16:9) request makes many phones crop the sensor,
+        // which narrows the view before the app does anything.
+        video: { facingMode: state.facing, aspectRatio: { ideal: 4 / 3 }, width: { ideal: 1440 }, height: { ideal: 1080 } },
       });
       state.stream = stream;
       els.video.srcObject = stream;
@@ -513,6 +540,7 @@
     els.empty.hidden = mode !== "empty";
     els.cameraControls.hidden = mode !== "camera";
     els.photoControls.hidden = mode !== "photo";
+    els.zoomRow.hidden = mode === "empty";
     els.btnDownload.disabled = mode !== "photo";
     els.btnShare.disabled = mode !== "photo";
     updateCrownUI();
@@ -591,6 +619,25 @@
   els.crownToggle.addEventListener("change", () => { state.crown = els.crownToggle.checked; updateCrownUI(); if (state.mode === "photo") render(); });
   els.crownY.addEventListener("input", () => { state.crownY = parseFloat(els.crownY.value); if (state.mode === "photo") render(); });
   els.crownSize.addEventListener("input", () => { state.crownScale = parseFloat(els.crownSize.value); if (state.mode === "photo") render(); });
+  els.zoom.addEventListener("input", () => {
+    // The crown pose is stored in canvas pixels, so re-map it to the new zoom.
+    const before = state.source ? photoTransform(state.srcW, state.srcH) : null;
+    state.zoom = parseFloat(els.zoom.value);
+    if (before && state.face) {
+      const after = photoTransform(state.srcW, state.srcH);
+      const remap = (p) => {
+        if (!p) return;
+        const k = after.s / before.s;
+        const x0 = state.mirror ? W - p.x : p.x;
+        const x1 = after.dx + (x0 - before.dx) * k;
+        p.x = state.mirror ? W - x1 : x1;
+        p.y = after.dy + (p.y - before.dy) * k;
+        p.w *= k;
+      };
+      remap(state.face); if (state.faceRaw !== state.face) remap(state.faceRaw);
+    }
+    if (state.mode === "photo") render();
+  });
   els.btnDownload.addEventListener("click", download);
   els.btnShare.addEventListener("click", share);
   els.btnHelp.addEventListener("click", () => els.help.showModal());

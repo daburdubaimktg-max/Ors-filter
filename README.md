@@ -9,6 +9,8 @@ No app install, no backend, nothing uploaded — the camera feed and the final i
 ## What it does
 
 - **Live camera** (front/back, 3-second timer, mirror) or **photo upload**.
+- **No forced zoom.** The camera is asked for its full 4:3 picture, and the whole photo is shown by default with a
+  soft blurred fill around it. A slider under the preview goes from "Whole photo" to "Fill frame" (9:16 crop).
 - **Frame overlay**, kept light: the stylist's name, "Stylist of the Future", a kente stripe, and a
   "GHABA × ORS Olive Oil" lockup using the official ORS mark. The top of the frame stays clear for the head.
 - **Olive-leaf crown with head tracking.** MediaPipe Face Landmarker follows the head live in the camera and
