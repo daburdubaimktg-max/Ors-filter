@@ -393,7 +393,7 @@
 
   function detectStill() {
     state.face = null; state.faceRaw = null;
-    if (!state.tracker || !state.source) return;
+    if (!state.tracker || !state.source) { updateCrownUI(); return; }
     try {
       // In video mode the tracker first looks where the previous face was; a new photo can need a second pass.
       for (let i = 0; i < 3 && !state.face; i++) {
