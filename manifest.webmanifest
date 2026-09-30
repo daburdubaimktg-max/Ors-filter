@@ -1,0 +1,10 @@
+{
+  "name": "CrownCam · GHABA × ORS Olive Oil",
+  "short_name": "CrownCam",
+  "description": "Stories frame for GHABA × ORS Olive Oil — Stylist of the Future.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#14261A",
+  "theme_color": "#14261A",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
