@@ -136,6 +136,9 @@ input[type="range"] { width: 100%; accent-color: var(--gold); }
 .btn.ghost:disabled { opacity: 0.45; cursor: not-allowed; }
 .hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0; }
 .status { margin: -6px 0 0; font-size: 13px; min-height: 1em; }
+.zoom-row { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 420px; }
+.zoom-row input { flex: 1; min-width: 0; }
+.zoom-end { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 .help { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); padding: 24px; max-width: 420px; width: calc(100% - 32px); }
 .help::backdrop { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
