@@ -8,18 +8,23 @@ No app install, no backend, nothing uploaded — the camera feed and the final i
 
 ## What it does
 
-- **Live camera** (front/back, 3-second timer, mirror) or **photo upload**.
-- **No forced zoom.** The camera is asked for its full 4:3 picture, and the whole photo is shown by default with a
-  soft blurred fill around it. A slider under the preview goes from "Whole photo" to "Fill frame" (9:16 crop).
-- **Frame overlay**, kept light: the stylist's name, "Stylist of the Future", a kente stripe, and a
-  "GHABA × ORS Olive Oil" lockup using the official ORS mark. The top of the frame stays clear for the head.
-- **Olive-leaf crown with head tracking.** MediaPipe Face Landmarker follows the head live in the camera and
-  finds it in uploaded photos. The crown sizes itself to the head, sits at temple height, and tilts with it.
-  A size slider fine-tunes the fit. If tracking can't load, a position slider places the crown by hand.
-- **Six looks**: Olive, Gold, Ivory, Kente (woven kente-strip border), Noir (black-and-white portrait with gold
-  type) and Golden Hour (warm sunset grade). Photo grades use canvas blend modes, so they work in Safari too.
-- **Save for Stories** (PNG, 9:16) and native **Share** on phones that support it.
-- Remembers the name and chosen look on the device for repeat use.
+1. **Start** — one button opens the camera (or upload a photo instead).
+2. **Scan** — when a face is found, a gold scan sweeps it and a 3D olive wreath spins down onto the head. Leaves
+   of different sizes pop in from the back to the front, olives appear, and it lands with a sparkle burst. The
+   reveal takes about four seconds; tap the picture to replay it.
+3. **Pose** — the wreath is a real 3D ring around the head: it turns with the head (yaw), nods with it (pitch) and
+   tilts with it (roll), and the near side covers the far side.
+4. **Look** — pick one of six looks: Olive, Gold, Ivory, Kente, Noir (black-and-white) or Golden (warm grade).
+5. **Save** — after the shot, add your name and tap **Save to Stories** (PNG, 1080 × 1920), or **Share** on phones
+   that support it. The saved image shows the finished wreath.
+
+Other details:
+
+- The camera is asked for its full 4:3 picture, and the whole photo is shown with a soft blurred fill. The corner
+  button switches to filling the 9:16 frame.
+- The frame keeps text light: name, "Stylist of the Future", a kente stripe and the GHABA × ORS Olive Oil lockup.
+- If no face is found in an uploaded photo, drag the wreath into place and set its size with the slider.
+- Name and chosen look are remembered on the device.
 
 ## Run it
 
